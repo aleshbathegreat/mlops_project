@@ -9,5 +9,5 @@ Remarks: dataset was small and mostly numerical so a lot of pre-processing was n
 
 Tasks: API endpoints, tests and Ruff, Docker and CI pipeline
 
-Remarks: creating health and predict endpoints and testing them with different inputs to check for errors and proper implementation of code. Regular merging was done in github to ensure smooth CI pipeline. Both jobs: test and docker succeeded.
+Remarks: creating health, predict and docs endpoints and testing them with different inputs to check for errors and proper implementation of code. Regular merging was done in github to ensure smooth CI pipeline. Both jobs: test and docker succeeded.
 
