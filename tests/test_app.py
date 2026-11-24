@@ -65,3 +65,30 @@ def test_prepare_data_rejects_bad_data(tmp_path):
     raw.to_csv(bad, index=False)
     with pytest.raises(AssertionError):
         prepare_data(raw_path=str(bad), out_path=str(tmp_path / "o.csv"))
+
+
+def test_stats_endpoint():
+    r = client.get("/stats")
+    assert r.status_code == 200
+    body = r.json()
+    assert set(body.keys()) == {
+        "total_requests",
+        "predict_requests",
+        "avg_latency_ms",
+        "uptime_seconds",
+    }
+    assert isinstance(body["total_requests"], int) and body["total_requests"] >= 0
+    assert isinstance(body["predict_requests"], int) and body["predict_requests"] >= 0
+    assert isinstance(body["avg_latency_ms"], float) and body["avg_latency_ms"] >= 0.0
+    assert isinstance(body["uptime_seconds"], float) and body["uptime_seconds"] >= 0.0
+
+
+def test_stats_tracks_predict_requests():
+    before = client.get("/stats").json()
+    r = client.post("/predict", json=VALID)
+    assert r.status_code == 200
+    after = client.get("/stats").json()
+    assert after["predict_requests"] == before["predict_requests"] + 1
+    assert after["total_requests"] == before["total_requests"] + 2
+    assert after["avg_latency_ms"] > 0.0
+    assert after["uptime_seconds"] >= before["uptime_seconds"]
