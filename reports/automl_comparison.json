@@ -1,0 +1,70 @@
+{
+  "metadata": {
+    "data_path": "data/processed.csv",
+    "dataset_rows": 400,
+    "train_rows": 320,
+    "test_rows": 80,
+    "cv_protocol": "RepeatedStratifiedKFold(n_splits=5, n_repeats=3)",
+    "time_budget_sec": 20.0,
+    "random_state": 42,
+    "mlflow_experiment": "admission-automl-comparison",
+    "timestamp_utc": "2026-11-24T18:30:39.392861+00:00"
+  },
+  "results": [
+    {
+      "name": "logreg_C10",
+      "method": "manual_champion",
+      "best_estimator": "logreg",
+      "best_config": {
+        "C": 10.0
+      },
+      "cv_f1_mean": 0.851,
+      "cv_f1_std": 0.0372,
+      "test_f1": 0.8406,
+      "test_roc_auc": 0.9539,
+      "train_time_sec": 0.0027,
+      "inference_latency_ms": 0.1872
+    },
+    {
+      "name": "cgpa_only_logreg",
+      "method": "manual_baseline",
+      "best_estimator": "cgpa_only",
+      "best_config": {},
+      "cv_f1_mean": 0.8566,
+      "cv_f1_std": 0.0302,
+      "test_f1": 0.8406,
+      "test_roc_auc": 0.9571,
+      "train_time_sec": 0.0046,
+      "inference_latency_ms": 0.6917
+    },
+    {
+      "name": "flaml_automl",
+      "method": "automl",
+      "best_estimator": "xgboost",
+      "best_config": {
+        "n_estimators": 4,
+        "max_leaves": 4,
+        "min_child_weight": 0.9999999999999993,
+        "learning_rate": 0.09999999999999995,
+        "subsample": 1.0,
+        "colsample_bylevel": 1.0,
+        "colsample_bytree": 1.0,
+        "reg_alpha": 0.0009765625,
+        "reg_lambda": 1.0
+      },
+      "cv_f1_mean": 0.8328,
+      "cv_f1_std": 0.0417,
+      "test_f1": 0.8529,
+      "test_roc_auc": 0.9498,
+      "train_time_sec": 20.0523,
+      "inference_latency_ms": 0.413
+    }
+  ],
+  "summary": {
+    "best_cv_f1_model": "cgpa_only_logreg",
+    "flaml_vs_manual_cv_f1_delta": -0.0182,
+    "within_one_std": true,
+    "automl_outperforms_manual": false,
+    "takeaway": "On 400 records, FLAML (xgboost, CV F1 0.8328 +/- 0.0417) does not meaningfully outperform the simple manual champion logreg_C10 (CV F1 0.8510 +/- 0.0372; delta -0.0182, within 1 SD) or the CGPA-only baseline (CV F1 0.8566). Keeping logreg_C10 is preferable for simplicity, lower training cost (0.0027s vs 20.05s), and fast inference."
+  }
+}
