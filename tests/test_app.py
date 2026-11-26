@@ -5,7 +5,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from src.app import app
-from src.prepare_data import prepare_data
+from src.prepare_data import RAW, prepare_data
 
 client = TestClient(app)
 
@@ -59,7 +59,7 @@ def test_prepare_data_output(tmp_path):
 
 
 def test_prepare_data_rejects_bad_data(tmp_path):
-    raw = pd.read_csv("data/Admission_Predict.csv")
+    raw = pd.read_csv(RAW)
     raw.loc[0, "CGPA"] = 15
     bad = tmp_path / "bad.csv"
     raw.to_csv(bad, index=False)
