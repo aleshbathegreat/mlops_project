@@ -14,7 +14,12 @@ from sklearn.ensemble import (
     VotingClassifier,
 )
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score, f1_score, make_scorer, roc_auc_score
+from sklearn.metrics import (
+    balanced_accuracy_score,
+    f1_score,
+    make_scorer,
+    roc_auc_score,
+)
 from sklearn.model_selection import (
     RepeatedStratifiedKFold,
     cross_validate,
@@ -39,6 +44,9 @@ FEATURES = [
     "Research",
 ]
 CGPA_IDX = FEATURES.index("CGPA")
+CV_SPLITS = 5
+CV_REPEATS = 2
+CW = "balanced"  # the admitted class is about 79%, so weight classes equally
 
 # (run name, model family, hyperparameters)
 CONFIGS = [
@@ -71,54 +79,6 @@ CONFIGS = [
     ("stacking", "stacking", {}),
 ]
 
-
-def scaled(model):
-    return make_pipeline(StandardScaler(), model)
-
-
-def members():
-    return [
-        ("lr", scaled(LogisticRegression(max_iter=1000, C=1.0))),
-        ("rf", RandomForestClassifier(n_estimators=200, max_depth=5, random_state=42)),
-        ("svm", scaled(SVC(probability=True, C=1.0, random_state=42))),
-    ]
-
-
-def build(family, p):
-    if family == "dummy":
-        return DummyClassifier(random_state=42, **p)
-    if family == "cgpa_only":
-        return make_pipeline(
-            ColumnTransformer([("cgpa", StandardScaler(), [CGPA_IDX])]),
-            LogisticRegression(max_iter=1000),
-        )
-    if family == "logreg":
-        return scaled(LogisticRegression(max_iter=1000, **p))
-    if family == "tree":
-        return DecisionTreeClassifier(random_state=42, **p)
-    if family == "rf":
-        return RandomForestClassifier(random_state=42, **p)
-    if family == "extra":
-        return ExtraTreesClassifier(random_state=42, **p)
-    if family == "gb":
-        return GradientBoostingClassifier(random_state=42, **p)
-    if family == "svm":
-        return scaled(SVC(probability=True, random_state=42, **p))
-    if family == "knn":
-        return scaled(KNeighborsClassifier(**p))
-    if family == "mlp":
-        return scaled(MLPClassifier(max_iter=2000, random_state=42, **p))
-    if family == "voting":
-        return VotingClassifier(estimators=members(), voting="soft")
-    if family == "stacking":
-        return StackingClassifier(
-            estimators=members(),
-            final_estimator=LogisticRegression(max_iter=1000),
-            cv=5,
-        )
-    raise ValueError(f"Unknown family: {family}")
-
-
 # Baselines are reference points, not deployable champions.
 BASELINES = {"dummy", "cgpa_only"}
 # Lower = simpler. Breaks ties between models that score about the same.
@@ -136,8 +96,64 @@ COMPLEXITY = {
 }
 
 
+def scaled(model):
+    return make_pipeline(StandardScaler(), model)
+
+
+def members():
+    return [
+        ("lr", scaled(LogisticRegression(max_iter=1000, class_weight=CW))),
+        (
+            "rf",
+            RandomForestClassifier(
+                n_estimators=200, max_depth=5, class_weight=CW, random_state=42
+            ),
+        ),
+        ("svm", scaled(SVC(probability=True, class_weight=CW, random_state=42))),
+    ]
+
+
+def build(family, p):
+    if family == "dummy":
+        return DummyClassifier(random_state=42, **p)
+    if family == "cgpa_only":
+        return make_pipeline(
+            ColumnTransformer([("cgpa", StandardScaler(), [CGPA_IDX])]),
+            LogisticRegression(max_iter=1000, class_weight=CW),
+        )
+    if family == "logreg":
+        return scaled(LogisticRegression(max_iter=1000, class_weight=CW, **p))
+    if family == "tree":
+        return DecisionTreeClassifier(class_weight=CW, random_state=42, **p)
+    if family == "rf":
+        return RandomForestClassifier(class_weight=CW, random_state=42, **p)
+    if family == "extra":
+        return ExtraTreesClassifier(class_weight=CW, random_state=42, **p)
+    if family == "gb":
+        return GradientBoostingClassifier(random_state=42, **p)
+    if family == "svm":
+        return scaled(SVC(probability=True, class_weight=CW, random_state=42, **p))
+    if family == "knn":
+        return scaled(KNeighborsClassifier(**p))
+    if family == "mlp":
+        return scaled(MLPClassifier(max_iter=2000, random_state=42, **p))
+    if family == "voting":
+        return VotingClassifier(estimators=members(), voting="soft")
+    if family == "stacking":
+        return StackingClassifier(
+            estimators=members(),
+            final_estimator=LogisticRegression(max_iter=1000, class_weight=CW),
+            cv=5,
+        )
+    raise ValueError(f"Unknown family: {family}")
+
+
 def pick_champion(rows):
-    """rows: (name, family, cv_f1, cv_f1_std, test_f1, test_auc)."""
+    """rows: (name, family, cv_auc, cv_auc_std, cv_bal_acc, test_auc, test_bal_acc).
+
+    Best full-feature model by CV ROC-AUC, then the simplest model within one
+    standard deviation of it.
+    """
     eligible = [r for r in rows if r[1] not in BASELINES]
     top = max(eligible, key=lambda r: r[2])
     close = [r for r in eligible if r[2] >= top[2] - top[3]]
@@ -150,15 +166,18 @@ def train():
     X_tr, X_te, y_tr, y_te = train_test_split(
         X, y, test_size=0.2, random_state=42, stratify=y
     )
-    cv = RepeatedStratifiedKFold(n_splits=5, n_repeats=3, random_state=42)
+    cv = RepeatedStratifiedKFold(
+        n_splits=CV_SPLITS, n_repeats=CV_REPEATS, random_state=42
+    )
     scoring = {
-        "f1": make_scorer(f1_score, zero_division=0),
         "auc": "roc_auc",
-        "acc": "accuracy",
+        "bal_acc": "balanced_accuracy",
+        "f1_macro": "f1_macro",
+        "f1": make_scorer(f1_score, zero_division=0),
     }
 
     mlflow.set_tracking_uri("sqlite:///mlflow.db")
-    mlflow.set_experiment("admission-prediction")
+    mlflow.set_experiment("admission-prediction-3k")
 
     rows = []
     fitted = {}
@@ -169,40 +188,39 @@ def train():
 
             model = build(family, params)
             res = cross_validate(model, X_tr, y_tr, cv=cv, scoring=scoring)
-            cv_f1 = res["test_f1"].mean()
             cv_auc = res["test_auc"].mean()
-            mlflow.log_metric("cv_f1", cv_f1)
-            mlflow.log_metric("cv_f1_std", res["test_f1"].std())
+            cv_auc_std = res["test_auc"].std()
+            cv_bal = res["test_bal_acc"].mean()
             mlflow.log_metric("cv_auc", cv_auc)
-            mlflow.log_metric("cv_acc", res["test_acc"].mean())
+            mlflow.log_metric("cv_auc_std", cv_auc_std)
+            mlflow.log_metric("cv_bal_acc", cv_bal)
+            mlflow.log_metric("cv_f1_macro", res["test_f1_macro"].mean())
+            mlflow.log_metric("cv_f1", res["test_f1"].mean())
 
             model.fit(X_tr, y_tr)
             pred = model.predict(X_te)
-            proba = model.predict_proba(X_te)[:, 1]
-            test_f1 = f1_score(y_te, pred, zero_division=0)
-            test_auc = roc_auc_score(y_te, proba)
-            mlflow.log_metric("test_f1", test_f1)
+            test_auc = roc_auc_score(y_te, model.predict_proba(X_te)[:, 1])
+            test_bal = balanced_accuracy_score(y_te, pred)
             mlflow.log_metric("test_auc", test_auc)
-            mlflow.log_metric("test_acc", accuracy_score(y_te, pred))
+            mlflow.log_metric("test_bal_acc", test_bal)
+            mlflow.log_metric("test_f1", f1_score(y_te, pred, zero_division=0))
 
-            rows.append((name, family, cv_f1, res["test_f1"].std(), test_f1, test_auc))
-            print(f"{name:20s} cv_f1={cv_f1:.4f} test_f1={test_f1:.4f}")
-
-            # champion is chosen on cross-validation only, never on the test set
+            rows.append((name, family, cv_auc, cv_auc_std, cv_bal, test_auc, test_bal))
             fitted[name] = model
+            print(f"{name:20s} cv_auc={cv_auc:.4f} cv_bal_acc={cv_bal:.4f}", flush=True)
 
     champion = pick_champion(rows)
     os.makedirs("models", exist_ok=True)
     with open("models/model.pkl", "wb") as f:
         pickle.dump(fitted[champion[0]], f)
 
-    print("\nRanking by CV F1:")
+    print("\nRanking by CV ROC-AUC:")
     for r in sorted(rows, key=lambda r: r[2], reverse=True):
         print(
-            f"{r[0]:20s} {r[1]:9s} cv_f1={r[2]:.4f} (+/-{r[3]:.4f}) "
-            f"test_f1={r[4]:.4f} test_auc={r[5]:.4f}"
+            f"{r[0]:20s} {r[1]:9s} cv_auc={r[2]:.4f} (+/-{r[3]:.4f}) "
+            f"cv_bal_acc={r[4]:.4f} test_auc={r[5]:.4f} test_bal_acc={r[6]:.4f}"
         )
-    print(f"\nChampion: {champion[0]} (CV F1 {champion[2]:.4f})")
+    print(f"\nChampion: {champion[0]} (CV ROC-AUC {champion[2]:.4f})")
 
 
 if __name__ == "__main__":
