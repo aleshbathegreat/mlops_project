@@ -11,7 +11,7 @@ from seven academic features.
 
 ```mermaid
 flowchart LR
-    A[Admission_Predict.csv] --> B[prepare_data.py<br/>clean + validate]
+    A[graduate_admission.csv] --> B[prepare_data.py<br/>clean + validate]
     B --> C[processed.csv]
     C --> D[train.py<br/>20 models, repeated CV]
     D --> E[(MLflow tracking)]
@@ -23,11 +23,22 @@ flowchart LR
 
 ## Dataset
 
-Graduate Admissions dataset (Mohan S. Acharya): 400 applicants, seven
-features, no missing values. Features: GRE Score, TOEFL Score, University
-Rating, SOP, LOR, CGPA, Research. The `Serial No.` column is dropped, and the
-original `Chance of Admit` column is only used to build the label; it is never
-a model input. The dataset has no time column.
+Graduate admissions data (Kaggle: melovi/uni-admission): 3,000 applicants
+extending the original 400-record Graduate Admissions dataset (Mohan S.
+Acharya). Seven features: GRE Score, TOEFL Score, University Rating, SOP,
+LOR, CGPA, Research. After dropping the identifier column, the free-text
+motivation letter, and one exact duplicate, 2,999 records remain, with no
+missing values.
+
+`Serial No.` is dropped because row order leaks the outcome: the first 400
+rows are the original data, which has lower admission chances, so the ID alone
+predicts the label. The `Chance of Admit` column is only used to build the
+label (>= 0.75, about 79% admitted); it is never a model input.
+
+The 2,600 added rows have a shifted target distribution compared with the
+original 400 (higher chances, a weaker link to CGPA), so results should be
+read as illustrative rather than as claims about real admissions. The dataset
+has no time column.
 
 ## Quick start
 
@@ -47,7 +58,7 @@ pytest tests/ -v
 uvicorn src.app:app
 ```
 
-Then open http://127.0.0.1:8000/docs. Training takes one to three minutes and
+Then open http://127.0.0.1:8000/docs. Training takes a few minutes and
 creates `models/model.pkl` and `mlflow.db` locally; both are git-ignored.
 
 To browse the experiments:
@@ -92,25 +103,33 @@ not depend on any committed model file.
 
 20 configurations across 8 families (baselines, logistic regression, trees,
 SVM, KNN, small neural network, ensembles). Each is evaluated with 5-fold
-stratified cross-validation repeated 3 times (15 scores per model). The test
+stratified cross-validation repeated 2 times (10 scores per model). The test
 set (20% of the data) is scored once, for reporting only.
 
-**Selection rule:** the best full-feature model by mean CV F1, then the
+Because about 79% of applicants are admitted, accuracy and positive-class F1
+are misleading: always predicting "admitted" scores an F1 of 0.885. Models are
+therefore ranked by ROC-AUC, with balanced accuracy reported alongside, and
+class weights are used for the models that support them.
+
+**Selection rule:** the best full-feature model by mean CV ROC-AUC, then the
 simplest model within one standard deviation of it. Baselines are reference
 points and cannot be champions.
 
-**Champion:** logistic regression (C=10), CV F1 0.851 (+/- 0.037),
-test F1 0.841, test ROC-AUC 0.954.
+**Champion:** SVM with RBF kernel (C=10), CV ROC-AUC 0.958 (+/- 0.012),
+test ROC-AUC 0.969, test balanced accuracy 0.906.
 
 **Findings**
 
-- Every real model scored 0.80-0.86 CV F1. A random guesser scored 0.41.
-- The top ten models are within one standard deviation of each other, so
-  their ranking is not meaningful on 400 records.
-- A logistic regression on CGPA alone scored 0.857, level with the best
-  full-feature model: most of the signal sits in a single feature.
-- Test scores on 80 rows are noisy (two MLPs scored 0.90 and 0.72), which is
-  why the champion is chosen on cross-validation and not on the test set.
+- Both dummy baselines score ROC-AUC 0.50, and every other model scores at
+  least 0.90.
+- The top six models are within about 0.007 AUC of each other, so their order
+  is not meaningful; the simplest of them was chosen.
+- On the original 400 records, a CGPA-only model matched every full model. On
+  about 3,000 records, SVM, MLP and gradient boosting (0.95-0.96 AUC) clearly
+  beat logistic regression (0.923) and CGPA alone (0.892): the best model type
+  changes as the data grows.
+- Caveat: 2,600 of the records were added to the original 400 and differ in
+  distribution, so part of the gain may come from that shift.
 
 ![MLflow runs](docs/mlflow_runs.png)
 
@@ -139,8 +158,11 @@ Dockerfile            container image
 
 ## Limitations
 
-- 400 records means noisy comparisons; small differences between models
+- About 3,000 records is still small, and 2,600 of them were added to the
+  original 400 with a different distribution; small differences between models
   should not be over-read.
+- The classes are imbalanced (about 79% admitted), so metrics other than
+  accuracy are used to compare models.
 - The dataset has no time dimension, so behaviour under new data is studied
   by simulation rather than real arrivals.
 
