@@ -172,18 +172,21 @@ def _build_summary(results, n_rows):
     if outperforms:
         takeaway = (
             f"On {n_rows} records, {flaml_txt} outperformed {champ_txt} by "
-            f"{delta:+.4f} (outside 1 SD). Its fit time was "
-            f"{flaml_res['train_time_sec']:.2f}s vs "
-            f"{champ['train_time_sec']:.2f}s for the manual model."
+            f"{delta:+.4f} (outside 1 SD). Fit times cover the final fit only "
+            f"({flaml_res['train_time_sec']:.2f}s vs "
+            f"{champ['train_time_sec']:.2f}s); the manual champion was chosen "
+            "after a longer model search."
         )
     else:
         takeaway = (
             f"On {n_rows} records, {flaml_txt} does not meaningfully outperform "
             f"{champ_txt} (delta {delta:+.4f}, within 1 SD). Both clearly beat the "
             f"simple {SIMPLE_MODEL} ({simple['cv_auc_mean']:.4f}) and the CGPA-only "
-            f"baseline ({base['cv_auc_mean']:.4f}). Keeping the manual champion is "
-            f"preferable for simplicity and cost: {champ['train_time_sec']:.2f}s "
-            f"vs {flaml_res['train_time_sec']:.2f}s to fit."
+            f"baseline ({base['cv_auc_mean']:.4f}). Fit times cover the final fit "
+            f"only ({champ['train_time_sec']:.2f}s manual vs "
+            f"{flaml_res['train_time_sec']:.2f}s AutoML); the manual champion was "
+            "chosen after a longer model search, so the development-time "
+            "comparison is in reports/manual_vs_automl.md."
         )
 
     return {
