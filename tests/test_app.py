@@ -130,3 +130,20 @@ def test_predict_writes_structured_log(caplog):
     assert payload["inputs"]["cgpa"] == VALID["cgpa"]
     assert payload["admitted"] in (0, 1)
     assert 0.0 <= payload["probability"] <= 1.0
+
+
+def test_cors_headers():
+    origin = "http://localhost:3000"
+    preflight = client.options(
+        "/predict",
+        headers={
+            "Origin": origin,
+            "Access-Control-Request-Method": "POST",
+        },
+    )
+    assert preflight.status_code == 200
+    assert preflight.headers.get("access-control-allow-origin") == "*"
+
+    resp = client.get("/health", headers={"Origin": origin})
+    assert resp.status_code == 200
+    assert resp.headers.get("access-control-allow-origin") == "*"

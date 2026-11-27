@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Graduate Admission Predictor — MLOps Dashboard</title>
+  <style>
+    :root {
+      --bg: #0b0f17;
+      --surface: #121826;
+      --surface-2: #182133;
+      --border: #253147;
+      --text: #e6edf7;
+      --muted: #93a4bd;
+      --accent: #38bdf8;
+      --accent-soft: rgba(56, 189, 248, 0.14);
+      --green: #22c55e;
+      --green-soft: rgba(34, 197, 94, 0.14);
+      --amber: #f59e0b;
+      --amber-soft: rgba(245, 158, 11, 0.14);
+      --red: #ef4444;
+      --red-soft: rgba(239, 68, 68, 0.14);
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      --sans: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: radial-gradient(circle at top right, #162038 0%, var(--bg) 52%);
+      color: var(--text);
+      font-family: var(--sans);
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1220px;
+      margin: 0 auto;
+      padding: 24px 20px 48px;
+    }
+
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .title-group h1 {
+      margin: 0;
+      font-size: 1.5rem;
+      letter-spacing: -0.02em;
+    }
+
+    .title-group p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--muted);
+    }
+
+    .pill.ok {
+      color: var(--green);
+      background: var(--green-soft);
+      border-color: rgba(34, 197, 94, 0.35);
+    }
+
+    .pill.err {
+      color: var(--red);
+      background: var(--red-soft);
+      border-color: rgba(239, 68, 68, 0.35);
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px 20px;
+      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+    }
+
+    .card-header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .card-header h2 {
+      margin: 0;
+      font-size: 1.05rem;
+      font-weight: 600;
+    }
+
+    .subtle {
+      color: var(--muted);
+      font-size: 0.84rem;
+    }
+
+    .url-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .url-bar label {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--muted);
+    }
+
+    input, select, button {
+      font-family: inherit;
+    }
+
+    .input {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 9px;
+      padding: 9px 12px;
+      font-size: 0.92rem;
+      outline: none;
+      transition: border-color 0.15s ease;
+    }
+
+    .input:focus {
+      border-color: var(--accent);
+    }
+
+    .url-input {
+      flex: 1 1 280px;
+      font-family: var(--mono);
+      font-size: 0.88rem;
+    }
+
+    .btn {
+      background: var(--surface-2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      padding: 9px 14px;
+      font-size: 0.86rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s ease, border-color 0.15s ease;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn:hover {
+      border-color: var(--accent);
+      background: #1e293d;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #06121e;
+      border-color: var(--accent);
+    }
+
+    .btn-primary:hover {
+      background: #7dd3fc;
+      border-color: #7dd3fc;
+    }
+
+    .btn-sm {
+      padding: 6px 10px;
+      font-size: 0.8rem;
+    }
+
+    .grid-main {
+      display: grid;
+      grid-template-columns: 1.05fr 1fr;
+      gap: 18px;
+      margin-bottom: 18px;
+    }
+
+    @media (max-width: 920px) {
+      .grid-main { grid-template-columns: 1fr; }
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    @media (max-width: 720px) {
+      .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    .stat-box {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 11px 12px;
+    }
+
+    .stat-label {
+      font-size: 0.74rem;
+      color: var(--muted);
+      font-family: var(--mono);
+      word-break: break-word;
+    }
+
+    .stat-value {
+      margin-top: 4px;
+      font-size: 1.15rem;
+      font-weight: 700;
+      font-family: var(--mono);
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    @media (max-width: 520px) {
+      .form-grid { grid-template-columns: 1fr; }
+    }
+
+    .field label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-bottom: 5px;
+    }
+
+    .field input, .field select {
+      width: 100%;
+    }
+
+    .preset-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .result-box {
+      margin-top: 14px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+    }
+
+    .result-top {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .bar-track {
+      width: 100%;
+      height: 10px;
+      background: #0c121e;
+      border-radius: 999px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+
+    .bar-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--amber), var(--green));
+      transition: width 0.25s ease;
+    }
+
+    pre.curl-box {
+      margin: 12px 0 0;
+      padding: 12px;
+      background: #090d14;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      color: #cbd5e1;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.86rem;
+    }
+
+    th, td {
+      padding: 9px 10px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+    }
+
+    th {
+      color: var(--muted);
+      font-weight: 600;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    code {
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      background: var(--surface-2);
+      padding: 2px 6px;
+      border-radius: 6px;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+    }
+
+    .toggle-wrap {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 0.84rem;
+      color: var(--muted);
+      cursor: pointer;
+    }
+
+    .mt-14 { margin-top: 14px; }
+    .mb-18 { margin-bottom: 18px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="title-group">
+        <h1>Graduate Admission Predictor</h1>
+        <p>Live FastAPI Monitoring, Interactive Prediction Tester &amp; 2,999-Record AutoML Benchmark</p>
+      </div>
+      <div id="healthPill" class="pill">
+        <span class="dot"></span>
+        <span id="healthText">Checking /health...</span>
+      </div>
+    </header>
+
+    <section class="card url-bar">
+      <label for="baseUrl">API Base URL</label>
+      <input id="baseUrl" class="input url-input" type="url" value="http://127.0.0.1:8000" placeholder="http://127.0.0.1:8000" />
+      <button id="saveUrlBtn" class="btn btn-primary" type="button">Connect</button>
+      <a id="docsLink" class="btn btn-sm" href="http://127.0.0.1:8000/docs" target="_blank" rel="noopener">Swagger /docs</a>
+      <a id="redocLink" class="btn btn-sm" href="http://127.0.0.1:8000/redoc" target="_blank" rel="noopener">ReDoc</a>
+      <a id="openapiLink" class="btn btn-sm" href="http://127.0.0.1:8000/openapi.json" target="_blank" rel="noopener">openapi.json</a>
+    </section>
+
+    <section class="card mb-18">
+      <div class="card-header">
+        <div>
+          <h2>Live Service Health &amp; <code>/stats</code> Monitor</h2>
+          <div id="statsTimestamp" class="subtle">Waiting for first poll...</div>
+        </div>
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+          <label class="toggle-wrap">
+            <input id="autoRefresh" type="checkbox" checked />
+            Auto-refresh (5s)
+          </label>
+          <button id="refreshStatsBtn" class="btn btn-sm" type="button">Refresh Now</button>
+        </div>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-box"><div class="stat-label">total_requests</div><div id="st_total_requests" class="stat-value">-</div></div>
+        <div class="stat-box"><div class="stat-label">predict_requests</div><div id="st_predict_requests" class="stat-value">-</div></div>
+        <div class="stat-box"><div class="stat-label">avg_latency_ms</div><div id="st_avg_latency_ms" class="stat-value">-</div></div>
+        <div class="stat-box"><div class="stat-label">predict_avg_latency_ms</div><div id="st_predict_avg_latency_ms" class="stat-value">-</div></div>
+        <div class="stat-box"><div class="stat-label">predict_p95_latency_ms</div><div id="st_predict_p95_latency_ms" class="stat-value">-</div></div>
+        <div class="stat-box"><div class="stat-label">error_responses</div><div id="st_error_responses" class="stat-value">-</div></div>
+        <div class="stat-box"><div class="stat-label">predicted_admit_rate</div><div id="st_predicted_admit_rate" class="stat-value">-</div></div>
+        <div class="stat-box"><div class="stat-label">uptime_seconds</div><div id="st_uptime_seconds" class="stat-value">-</div></div>
+      </div>
+    </section>
+
+    <div class="grid-main">
+      <section class="card">
+        <div class="card-header">
+          <h2>Interactive Applicant Prediction Tester</h2>
+          <span class="subtle"><code>POST /predict</code></span>
+        </div>
+
+        <div class="preset-row">
+          <button class="btn btn-sm" type="button" data-preset="strong">Strong Applicant</button>
+          <button class="btn btn-sm" type="button" data-preset="borderline">Borderline Applicant</button>
+          <button class="btn btn-sm" type="button" data-preset="invalid">Out-of-Range (HTTP 422)</button>
+        </div>
+
+        <form id="predictForm">
+          <div class="form-grid">
+            <div class="field">
+              <label for="gre"><span>GRE Score</span><span>260–340</span></label>
+              <input id="gre" class="input" type="number" step="1" value="320" />
+            </div>
+            <div class="field">
+              <label for="toefl"><span>TOEFL Score</span><span>0–120</span></label>
+              <input id="toefl" class="input" type="number" step="1" value="110" />
+            </div>
+            <div class="field">
+              <label for="university_rating"><span>University Rating</span><span>1–5</span></label>
+              <input id="university_rating" class="input" type="number" step="1" value="4" />
+            </div>
+            <div class="field">
+              <label for="sop"><span>SOP</span><span>1.0–5.0</span></label>
+              <input id="sop" class="input" type="number" step="0.5" value="4.0" />
+            </div>
+            <div class="field">
+              <label for="lor"><span>LOR</span><span>1.0–5.0</span></label>
+              <input id="lor" class="input" type="number" step="0.5" value="4.0" />
+            </div>
+            <div class="field">
+              <label for="cgpa"><span>CGPA</span><span>0.0–10.0</span></label>
+              <input id="cgpa" class="input" type="number" step="0.01" value="9.0" />
+            </div>
+            <div class="field">
+              <label for="research"><span>Research</span><span>0 or 1</span></label>
+              <select id="research" class="input">
+                <option value="1" selected>1 (Yes)</option>
+                <option value="0">0 (No)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="mt-14" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+            <button class="btn btn-primary" type="submit">Run Prediction</button>
+            <button id="copyCurlBtn" class="btn btn-sm" type="button">Copy cURL</button>
+            <span id="copyStatus" class="subtle"></span>
+          </div>
+        </form>
+
+        <div class="result-box">
+          <div class="result-top">
+            <div id="predOutcome" style="font-weight:700;">No prediction run yet</div>
+            <div id="predMeta" class="subtle">HTTP - | - ms</div>
+          </div>
+          <div class="bar-track"><div id="probBar" class="bar-fill"></div></div>
+          <div id="predDetail" class="subtle mt-14"></div>
+        </div>
+
+        <pre id="curlPreview" class="curl-box"></pre>
+      </section>
+
+      <section class="card">
+        <div class="card-header">
+          <h2>Model &amp; AutoML Benchmark Summary</h2>
+          <span class="subtle">2,999 unique records</span>
+        </div>
+
+        <p class="subtle" style="margin-top:0;">
+          5-seed study on <code>data/Large_Dataset.csv</code> (<code>2,399</code> train / <code>600</code> sealed test,
+          <code>RepeatedStratifiedKFold(5, 3)</code>). Manual 20-model suite wins <strong>4/5 seeds</strong>;
+          FLAML lacks kernel <code>SVC</code> in its default search space.
+        </p>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Approach (5-Seed Study)</th>
+                <th>Compute / Budget</th>
+                <th>ROC-AUC</th>
+                <th>Wins</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Manual 20-model</strong> (<code>src/train.py</code>)</td>
+                <td><code>257s</code> compute</td>
+                <td><strong>0.9630</strong></td>
+                <td>Baseline</td>
+              </tr>
+              <tr>
+                <td>FLAML AutoML (15s)</td>
+                <td><code>15s</code> / <code>16s</code> dev</td>
+                <td>0.9557</td>
+                <td><code>0 / 5</code></td>
+              </tr>
+              <tr>
+                <td>FLAML AutoML (60s)</td>
+                <td><code>60s</code> / <code>61s</code> dev</td>
+                <td>0.9603</td>
+                <td><code>1 / 5</code></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 style="font-size:0.92rem; margin:16px 0 8px;">Single-Seed <code>automl_compare.py --time-budget 20</code></h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Model</th>
+                <th>Estimator</th>
+                <th>CV F1</th>
+                <th>Test AUC</th>
+                <th>Latency</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>logreg_C10</code></td>
+                <td><code>logreg</code></td>
+                <td>0.9485 +/- 0.0094</td>
+                <td>0.9347</td>
+                <td>0.1877 ms</td>
+              </tr>
+              <tr>
+                <td><code>cgpa_only_logreg</code></td>
+                <td><code>cgpa_only</code></td>
+                <td>0.9277 +/- 0.0087</td>
+                <td>0.8997</td>
+                <td>0.5520 ms</td>
+              </tr>
+              <tr>
+                <td><code>flaml_automl</code></td>
+                <td><code>lgbm</code></td>
+                <td>0.9558 +/- 0.0068</td>
+                <td>0.9612</td>
+                <td>0.7120 ms</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = "admission_api_base_url";
+    const baseUrlInput = document.getElementById("baseUrl");
+    const healthPill = document.getElementById("healthPill");
+    const healthText = document.getElementById("healthText");
+    const statsTimestamp = document.getElementById("statsTimestamp");
+    const autoRefresh = document.getElementById("autoRefresh");
+    const curlPreview = document.getElementById("curlPreview");
+
+    const PRESETS = {
+      strong: { gre: 332, toefl: 116, university_rating: 5, sop: 4.5, lor: 4.5, cgpa: 9.45, research: 1 },
+      borderline: { gre: 310, toefl: 103, university_rating: 3, sop: 3.0, lor: 3.0, cgpa: 8.15, research: 0 },
+      invalid: { gre: 320, toefl: 110, university_rating: 4, sop: 4.0, lor: 4.0, cgpa: 15.0, research: 1 }
+    };
+
+    function getBaseUrl() {
+      return (baseUrlInput.value || "http://127.0.0.1:8000").trim().replace(/\/+$/, "");
+    }
+
+    function syncDocLinks() {
+      const base = getBaseUrl();
+      document.getElementById("docsLink").href = `${base}/docs`;
+      document.getElementById("redocLink").href = `${base}/redoc`;
+      document.getElementById("openapiLink").href = `${base}/openapi.json`;
+    }
+
+    function getPayload() {
+      return {
+        gre: Number(document.getElementById("gre").value),
+        toefl: Number(document.getElementById("toefl").value),
+        university_rating: Number(document.getElementById("university_rating").value),
+        sop: Number(document.getElementById("sop").value),
+        lor: Number(document.getElementById("lor").value),
+        cgpa: Number(document.getElementById("cgpa").value),
+        research: Number(document.getElementById("research").value)
+      };
+    }
+
+    function updateCurl() {
+      const base = getBaseUrl();
+      const payload = JSON.stringify(getPayload(), null, 2);
+      curlPreview.textContent =
+`curl -fsS -X POST "${base}/predict" \\
+  -H "Content-Type: application/json" \\
+  -d '${payload}'`;
+    }
+
+    async function refreshHealthAndStats() {
+      const base = getBaseUrl();
+      try {
+        const [hRes, sRes] = await Promise.all([
+          fetch(`${base}/health`),
+          fetch(`${base}/stats`)
+        ]);
+        if (!hRes.ok) throw new Error(`/health HTTP ${hRes.status}`);
+        const hData = await hRes.json();
+        healthPill.className = "pill ok";
+        healthText.textContent = `Healthy (${hData.status || "ok"})`;
+
+        if (sRes.ok) {
+          const s = await sRes.json();
+          const fields = [
+            "total_requests",
+            "predict_requests",
+            "avg_latency_ms",
+            "predict_avg_latency_ms",
+            "predict_p95_latency_ms",
+            "error_responses",
+            "predicted_admit_rate",
+            "uptime_seconds"
+          ];
+          fields.forEach((k) => {
+            const el = document.getElementById(`st_${k}`);
+            if (el) el.textContent = s[k] !== undefined ? s[k] : "-";
+          });
+          statsTimestamp.textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
+        }
+      } catch (err) {
+        healthPill.className = "pill err";
+        healthText.textContent = `Unreachable (${err.message})`;
+        statsTimestamp.textContent = `Failed to poll ${base} at ${new Date().toLocaleTimeString()}`;
+      }
+    }
+
+    async function runPrediction(e) {
+      e.preventDefault();
+      const base = getBaseUrl();
+      const payload = getPayload();
+      const outcomeEl = document.getElementById("predOutcome");
+      const metaEl = document.getElementById("predMeta");
+      const barEl = document.getElementById("probBar");
+      const detailEl = document.getElementById("predDetail");
+
+      const t0 = performance.now();
+      try {
+        const res = await fetch(`${base}/predict`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const elapsed = (performance.now() - t0).toFixed(1);
+        const body = await res.json();
+        metaEl.textContent = `HTTP ${res.status} | ${elapsed} ms`;
+
+        if (res.ok) {
+          const pct = Math.max(0, Math.min(100, body.probability * 100));
+          barEl.style.width = `${pct.toFixed(1)}%`;
+          outcomeEl.textContent = body.admitted === 1
+            ? `Admitted (1) — ${pct.toFixed(1)}% probability`
+            : `Not Admitted (0) — ${pct.toFixed(1)}% probability`;
+          outcomeEl.style.color = body.admitted === 1 ? "var(--green)" : "var(--amber)";
+          detailEl.textContent = JSON.stringify(body);
+        } else {
+          barEl.style.width = "0%";
+          outcomeEl.textContent = `Validation / API Error (HTTP ${res.status})`;
+          outcomeEl.style.color = "var(--red)";
+          detailEl.textContent = JSON.stringify(body.detail || body);
+        }
+        refreshHealthAndStats();
+      } catch (err) {
+        metaEl.textContent = "Network error";
+        barEl.style.width = "0%";
+        outcomeEl.textContent = `Request failed: ${err.message}`;
+        outcomeEl.style.color = "var(--red)";
+        detailEl.textContent = "";
+      }
+    }
+
+    const savedUrl = localStorage.getItem(STORAGE_KEY);
+    if (savedUrl) baseUrlInput.value = savedUrl;
+    syncDocLinks();
+    updateCurl();
+    refreshHealthAndStats();
+
+    document.getElementById("saveUrlBtn").addEventListener("click", () => {
+      localStorage.setItem(STORAGE_KEY, getBaseUrl());
+      syncDocLinks();
+      updateCurl();
+      refreshHealthAndStats();
+    });
+
+    document.getElementById("refreshStatsBtn").addEventListener("click", refreshHealthAndStats);
+    document.getElementById("predictForm").addEventListener("submit", runPrediction);
+    document.getElementById("predictForm").addEventListener("input", updateCurl);
+    baseUrlInput.addEventListener("input", () => {
+      syncDocLinks();
+      updateCurl();
+    });
+
+    document.querySelectorAll("[data-preset]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const p = PRESETS[btn.dataset.preset];
+        Object.entries(p).forEach(([k, v]) => {
+          document.getElementById(k).value = v;
+        });
+        updateCurl();
+      });
+    });
+
+    document.getElementById("copyCurlBtn").addEventListener("click", async () => {
+      const status = document.getElementById("copyStatus");
+      try {
+        await navigator.clipboard.writeText(curlPreview.textContent);
+        status.textContent = "Copied!";
+      } catch {
+        status.textContent = "Copy manually from box below.";
+      }
+      setTimeout(() => { status.textContent = ""; }, 2000);
+    });
+
+    setInterval(() => {
+      if (autoRefresh.checked) refreshHealthAndStats();
+    }, 5000);
+  </script>
+</body>
+</html>

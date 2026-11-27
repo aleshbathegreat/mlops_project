@@ -7,6 +7,7 @@ import time
 from collections import deque
 
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger("admission_api")
@@ -20,6 +21,12 @@ if not logger.handlers:
 logger.propagate = False
 
 app = FastAPI(title="Graduate Admission Predictor")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["*"],
+)
 
 with open("models/model.pkl", "rb") as f:
     model = pickle.load(f)

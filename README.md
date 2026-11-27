@@ -74,6 +74,23 @@ To run the bounded AutoML vs. manual comparison on demand (20-second budget):
 python src/automl_compare.py --time-budget 20
 ```
 
+### Frontend Dashboard (`dashboard/index.html`)
+
+A zero-dependency interactive dashboard is included in
+[dashboard/index.html](dashboard/index.html) for live `/health` and `/stats`
+monitoring, interactive `/predict` testing with presets and live `cURL`
+generation, and viewing the 2,999-record AutoML vs. manual benchmark summary.
+
+Serve it locally (or open the file directly in a browser) while the API is
+running locally or on EC2:
+
+```bash
+python -m http.server 3000 --directory dashboard
+```
+
+Then open http://127.0.0.1:3000 and set the **API Base URL** bar to
+`http://127.0.0.1:8000` (local) or `http://<EC2_PUBLIC_IP>:8000` (EC2).
+
 ## API & Monitoring
 
 | Endpoint | Method | Purpose |
@@ -273,6 +290,7 @@ src/prepare_data.py          data cleaning and validation
 src/train.py                 20-model comparison, MLflow logging, champion selection
 src/automl_compare.py        bounded FLAML AutoML vs. manual benchmark + MLflow/reports
 src/app.py                   FastAPI service (/health, /predict, /stats, /docs)
+dashboard/index.html         zero-dependency interactive monitoring & prediction dashboard
 tests/test_app.py            API, monitoring, and data validation tests
 tests/test_automl_compare.py fast AutoML comparison unit tests
 reports/                     AutoML vs. manual comparison Markdown and JSON reports
