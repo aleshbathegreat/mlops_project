@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -24,7 +25,9 @@
       --sans: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
 
-    * { box-sizing: border-box; }
+    * {
+      box-sizing: border-box;
+    }
 
     body {
       margin: 0;
@@ -136,7 +139,9 @@
       color: var(--muted);
     }
 
-    input, select, button {
+    input,
+    select,
+    button {
       font-family: inherit;
     }
 
@@ -206,7 +211,9 @@
     }
 
     @media (max-width: 920px) {
-      .grid-main { grid-template-columns: 1fr; }
+      .grid-main {
+        grid-template-columns: 1fr;
+      }
     }
 
     .stats-grid {
@@ -216,7 +223,9 @@
     }
 
     @media (max-width: 720px) {
-      .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .stats-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
     }
 
     .stat-box {
@@ -247,7 +256,9 @@
     }
 
     @media (max-width: 520px) {
-      .form-grid { grid-template-columns: 1fr; }
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
     }
 
     .field label {
@@ -258,7 +269,8 @@
       margin-bottom: 5px;
     }
 
-    .field input, .field select {
+    .field input,
+    .field select {
       width: 100%;
     }
 
@@ -322,7 +334,8 @@
       font-size: 0.86rem;
     }
 
-    th, td {
+    th,
+    td {
       padding: 9px 10px;
       border-bottom: 1px solid var(--border);
       text-align: left;
@@ -357,10 +370,16 @@
       cursor: pointer;
     }
 
-    .mt-14 { margin-top: 14px; }
-    .mb-18 { margin-bottom: 18px; }
+    .mt-14 {
+      margin-top: 14px;
+    }
+
+    .mb-18 {
+      margin-bottom: 18px;
+    }
   </style>
 </head>
+
 <body>
   <div class="container">
     <header>
@@ -376,11 +395,14 @@
 
     <section class="card url-bar">
       <label for="baseUrl">API Base URL</label>
-      <input id="baseUrl" class="input url-input" type="url" value="http://127.0.0.1:8000" placeholder="http://127.0.0.1:8000" />
+      <input id="baseUrl" class="input url-input" type="url" value="http://127.0.0.1:8000"
+        placeholder="http://127.0.0.1:8000" />
       <button id="saveUrlBtn" class="btn btn-primary" type="button">Connect</button>
-      <a id="docsLink" class="btn btn-sm" href="http://127.0.0.1:8000/docs" target="_blank" rel="noopener">Swagger /docs</a>
+      <a id="docsLink" class="btn btn-sm" href="http://127.0.0.1:8000/docs" target="_blank" rel="noopener">Swagger
+        /docs</a>
       <a id="redocLink" class="btn btn-sm" href="http://127.0.0.1:8000/redoc" target="_blank" rel="noopener">ReDoc</a>
-      <a id="openapiLink" class="btn btn-sm" href="http://127.0.0.1:8000/openapi.json" target="_blank" rel="noopener">openapi.json</a>
+      <a id="openapiLink" class="btn btn-sm" href="http://127.0.0.1:8000/openapi.json" target="_blank"
+        rel="noopener">openapi.json</a>
     </section>
 
     <section class="card mb-18">
@@ -399,14 +421,38 @@
       </div>
 
       <div class="stats-grid">
-        <div class="stat-box"><div class="stat-label">total_requests</div><div id="st_total_requests" class="stat-value">-</div></div>
-        <div class="stat-box"><div class="stat-label">predict_requests</div><div id="st_predict_requests" class="stat-value">-</div></div>
-        <div class="stat-box"><div class="stat-label">avg_latency_ms</div><div id="st_avg_latency_ms" class="stat-value">-</div></div>
-        <div class="stat-box"><div class="stat-label">predict_avg_latency_ms</div><div id="st_predict_avg_latency_ms" class="stat-value">-</div></div>
-        <div class="stat-box"><div class="stat-label">predict_p95_latency_ms</div><div id="st_predict_p95_latency_ms" class="stat-value">-</div></div>
-        <div class="stat-box"><div class="stat-label">error_responses</div><div id="st_error_responses" class="stat-value">-</div></div>
-        <div class="stat-box"><div class="stat-label">predicted_admit_rate</div><div id="st_predicted_admit_rate" class="stat-value">-</div></div>
-        <div class="stat-box"><div class="stat-label">uptime_seconds</div><div id="st_uptime_seconds" class="stat-value">-</div></div>
+        <div class="stat-box">
+          <div class="stat-label">total_requests</div>
+          <div id="st_total_requests" class="stat-value">-</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">predict_requests</div>
+          <div id="st_predict_requests" class="stat-value">-</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">avg_latency_ms</div>
+          <div id="st_avg_latency_ms" class="stat-value">-</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">predict_avg_latency_ms</div>
+          <div id="st_predict_avg_latency_ms" class="stat-value">-</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">predict_p95_latency_ms</div>
+          <div id="st_predict_p95_latency_ms" class="stat-value">-</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">error_responses</div>
+          <div id="st_error_responses" class="stat-value">-</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">predicted_admit_rate</div>
+          <div id="st_predicted_admit_rate" class="stat-value">-</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">uptime_seconds</div>
+          <div id="st_uptime_seconds" class="stat-value">-</div>
+        </div>
       </div>
     </section>
 
@@ -470,7 +516,9 @@
             <div id="predOutcome" style="font-weight:700;">No prediction run yet</div>
             <div id="predMeta" class="subtle">HTTP - | - ms</div>
           </div>
-          <div class="bar-track"><div id="probBar" class="bar-fill"></div></div>
+          <div class="bar-track">
+            <div id="probBar" class="bar-fill"></div>
+          </div>
           <div id="predDetail" class="subtle mt-14"></div>
         </div>
 
@@ -521,44 +569,6 @@
             </tbody>
           </table>
         </div>
-
-        <h3 style="font-size:0.92rem; margin:16px 0 8px;">Single-Seed <code>automl_compare.py --time-budget 20</code></h3>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Model</th>
-                <th>Estimator</th>
-                <th>CV F1</th>
-                <th>Test AUC</th>
-                <th>Latency</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><code>logreg_C10</code></td>
-                <td><code>logreg</code></td>
-                <td>0.9485 +/- 0.0094</td>
-                <td>0.9347</td>
-                <td>0.1877 ms</td>
-              </tr>
-              <tr>
-                <td><code>cgpa_only_logreg</code></td>
-                <td><code>cgpa_only</code></td>
-                <td>0.9277 +/- 0.0087</td>
-                <td>0.8997</td>
-                <td>0.5520 ms</td>
-              </tr>
-              <tr>
-                <td><code>flaml_automl</code></td>
-                <td><code>lgbm</code></td>
-                <td>0.9558 +/- 0.0068</td>
-                <td>0.9612</td>
-                <td>0.7120 ms</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
       </section>
     </div>
   </div>
@@ -605,7 +615,7 @@
       const base = getBaseUrl();
       const payload = JSON.stringify(getPayload(), null, 2);
       curlPreview.textContent =
-`curl -fsS -X POST "${base}/predict" \\
+        `curl -fsS -X POST "${base}/predict" \\
   -H "Content-Type: application/json" \\
   -d '${payload}'`;
     }
@@ -738,4 +748,5 @@
     }, 5000);
   </script>
 </body>
+
 </html>
