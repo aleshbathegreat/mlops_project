@@ -1,9 +1,12 @@
+import hashlib
 import os
 import pickle
+import subprocess
 import warnings
 
 import mlflow
 import pandas as pd
+from mlflow import MlflowClient
 from sklearn.compose import ColumnTransformer
 from sklearn.dummy import DummyClassifier
 from sklearn.ensemble import (
@@ -148,6 +151,24 @@ def build(family, p):
     raise ValueError(f"Unknown family: {family}")
 
 
+def _sha256(path):
+    return hashlib.sha256(open(path, "rb").read()).hexdigest()[:16]
+
+
+def _git_commit():
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        return out.stdout.strip() or "unknown"
+    except (OSError, subprocess.SubprocessError):
+        return "unknown"
+
+
 def pick_champion(rows):
     """rows: (name, family, cv_auc, cv_auc_std, cv_bal_acc, test_auc, test_bal_acc).
 
@@ -179,10 +200,22 @@ def train():
     mlflow.set_tracking_uri("sqlite:///mlflow.db")
     mlflow.set_experiment("admission-prediction-3k")
 
+    data_sha = _sha256("data/processed.csv")
+    commit = _git_commit()
     rows = []
     fitted = {}
+    run_ids = {}
     for name, family, params in CONFIGS:
-        with mlflow.start_run(run_name=name):
+        with mlflow.start_run(run_name=name) as run:
+            run_ids[name] = run.info.run_id
+            mlflow.set_tag("git_commit", commit)
+            mlflow.log_params(
+                {
+                    "data_sha256": data_sha,
+                    "n_rows": len(df),
+                    "n_features": len(FEATURES),
+                }
+            )
             mlflow.log_param("family", family)
             mlflow.log_params({k: str(v) for k, v in params.items()})
 
@@ -210,6 +243,7 @@ def train():
             print(f"{name:20s} cv_auc={cv_auc:.4f} cv_bal_acc={cv_bal:.4f}", flush=True)
 
     champion = pick_champion(rows)
+    MlflowClient().set_tag(run_ids[champion[0]], "champion", "true")
     os.makedirs("models", exist_ok=True)
     with open("models/model.pkl", "wb") as f:
         pickle.dump(fitted[champion[0]], f)
