@@ -1,3 +1,4 @@
+import json
 import pickle
 
 import pandas as pd
@@ -5,7 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from src.app import app
-from src.prepare_data import prepare_data
+from src.prepare_data import RAW, prepare_data
 
 client = TestClient(app)
 
@@ -59,7 +60,7 @@ def test_prepare_data_output(tmp_path):
 
 
 def test_prepare_data_rejects_bad_data(tmp_path):
-    raw = pd.read_csv("data/Admission_Predict.csv")
+    raw = pd.read_csv(RAW)
     raw.loc[0, "CGPA"] = 15
     bad = tmp_path / "bad.csv"
     raw.to_csv(bad, index=False)
@@ -75,6 +76,10 @@ def test_stats_endpoint():
         "total_requests",
         "predict_requests",
         "avg_latency_ms",
+        "error_responses",
+        "predict_avg_latency_ms",
+        "predict_p95_latency_ms",
+        "predicted_admit_rate",
         "uptime_seconds",
     }
     assert isinstance(body["total_requests"], int) and body["total_requests"] >= 0
@@ -92,3 +97,36 @@ def test_stats_tracks_predict_requests():
     assert after["total_requests"] == before["total_requests"] + 2
     assert after["avg_latency_ms"] > 0.0
     assert after["uptime_seconds"] >= before["uptime_seconds"]
+
+
+def test_stats_counts_error_responses():
+    before = client.get("/stats").json()
+    r = client.post("/predict", json={**VALID, "cgpa": 15})
+    assert r.status_code == 422
+    after = client.get("/stats").json()
+    assert after["error_responses"] == before["error_responses"] + 1
+
+
+def test_stats_predict_latency_and_admit_rate():
+    client.post("/predict", json=VALID)
+    body = client.get("/stats").json()
+    assert body["predict_avg_latency_ms"] > 0.0
+    assert body["predict_p95_latency_ms"] >= body["predict_avg_latency_ms"] * 0.5
+    assert 0.0 <= body["predicted_admit_rate"] <= 1.0
+
+
+def test_predict_writes_structured_log(caplog):
+    from src.app import logger
+
+    logger.addHandler(caplog.handler)
+    try:
+        with caplog.at_level("INFO", logger="admission_api"):
+            client.post("/predict", json=VALID)
+    finally:
+        logger.removeHandler(caplog.handler)
+    lines = [r.getMessage() for r in caplog.records if "prediction {" in r.getMessage()]
+    assert lines, "no prediction log line"
+    payload = json.loads(lines[-1].split("prediction ", 1)[1])
+    assert payload["inputs"]["cgpa"] == VALID["cgpa"]
+    assert payload["admitted"] in (0, 1)
+    assert 0.0 <= payload["probability"] <= 1.0
