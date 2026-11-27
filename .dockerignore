@@ -13,4 +13,6 @@ __pycache__/
 mlruns/
 mlflow.db
 models/
+reports/
+data/processed.csv
 .env

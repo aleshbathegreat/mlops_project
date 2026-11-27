@@ -28,9 +28,9 @@ def test_run_comparison_outputs_and_metrics(tmp_path):
     assert md_path.exists()
 
     saved = json.loads(json_path.read_text(encoding="utf-8"))
-    assert saved["metadata"]["dataset_rows"] == 400
-    assert saved["metadata"]["train_rows"] == 320
-    assert saved["metadata"]["test_rows"] == 80
+    assert saved["metadata"]["dataset_rows"] == 2999
+    assert saved["metadata"]["train_rows"] == 2399
+    assert saved["metadata"]["test_rows"] == 600
     assert saved["metadata"]["time_budget_sec"] == 2.0
 
     by_name = {r["name"]: r for r in saved["results"]}

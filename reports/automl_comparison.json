@@ -1,14 +1,14 @@
 {
   "metadata": {
     "data_path": "data/processed.csv",
-    "dataset_rows": 400,
-    "train_rows": 320,
-    "test_rows": 80,
+    "dataset_rows": 2999,
+    "train_rows": 2399,
+    "test_rows": 600,
     "cv_protocol": "RepeatedStratifiedKFold(n_splits=5, n_repeats=3)",
     "time_budget_sec": 20.0,
     "random_state": 42,
     "mlflow_experiment": "admission-automl-comparison",
-    "timestamp_utc": "2026-11-24T18:30:39.392861+00:00"
+    "timestamp_utc": "2026-11-27T17:51:20.919488+00:00"
   },
   "results": [
     {
@@ -18,53 +18,52 @@
       "best_config": {
         "C": 10.0
       },
-      "cv_f1_mean": 0.851,
-      "cv_f1_std": 0.0372,
-      "test_f1": 0.8406,
-      "test_roc_auc": 0.9539,
-      "train_time_sec": 0.0027,
-      "inference_latency_ms": 0.1872
+      "cv_f1_mean": 0.9485,
+      "cv_f1_std": 0.0094,
+      "test_f1": 0.9458,
+      "test_roc_auc": 0.9347,
+      "train_time_sec": 0.003,
+      "inference_latency_ms": 0.1877
     },
     {
       "name": "cgpa_only_logreg",
       "method": "manual_baseline",
       "best_estimator": "cgpa_only",
       "best_config": {},
-      "cv_f1_mean": 0.8566,
-      "cv_f1_std": 0.0302,
-      "test_f1": 0.8406,
-      "test_roc_auc": 0.9571,
-      "train_time_sec": 0.0046,
-      "inference_latency_ms": 0.6917
+      "cv_f1_mean": 0.9277,
+      "cv_f1_std": 0.0087,
+      "test_f1": 0.9262,
+      "test_roc_auc": 0.8997,
+      "train_time_sec": 0.0024,
+      "inference_latency_ms": 0.552
     },
     {
       "name": "flaml_automl",
       "method": "automl",
-      "best_estimator": "xgboost",
+      "best_estimator": "lgbm",
       "best_config": {
-        "n_estimators": 4,
-        "max_leaves": 4,
-        "min_child_weight": 0.9999999999999993,
-        "learning_rate": 0.09999999999999995,
-        "subsample": 1.0,
-        "colsample_bylevel": 1.0,
-        "colsample_bytree": 1.0,
-        "reg_alpha": 0.0009765625,
-        "reg_lambda": 1.0
+        "n_estimators": 28,
+        "num_leaves": 12,
+        "min_child_samples": 71,
+        "learning_rate": 0.31379655220144437,
+        "log_max_bin": 6,
+        "colsample_bytree": 0.6622904059772807,
+        "reg_alpha": 0.010767168653883007,
+        "reg_lambda": 1.3796769826043216
       },
-      "cv_f1_mean": 0.8328,
-      "cv_f1_std": 0.0417,
-      "test_f1": 0.8529,
-      "test_roc_auc": 0.9498,
-      "train_time_sec": 20.0523,
-      "inference_latency_ms": 0.413
+      "cv_f1_mean": 0.9558,
+      "cv_f1_std": 0.0068,
+      "test_f1": 0.957,
+      "test_roc_auc": 0.9612,
+      "train_time_sec": 20.1079,
+      "inference_latency_ms": 0.712
     }
   ],
   "summary": {
-    "best_cv_f1_model": "cgpa_only_logreg",
-    "flaml_vs_manual_cv_f1_delta": -0.0182,
+    "best_cv_f1_model": "flaml_automl",
+    "flaml_vs_manual_cv_f1_delta": 0.0073,
     "within_one_std": true,
     "automl_outperforms_manual": false,
-    "takeaway": "On 400 records, FLAML (xgboost, CV F1 0.8328 +/- 0.0417) does not meaningfully outperform the simple manual champion logreg_C10 (CV F1 0.8510 +/- 0.0372; delta -0.0182, within 1 SD) or the CGPA-only baseline (CV F1 0.8566). Keeping logreg_C10 is preferable for simplicity, lower training cost (0.0027s vs 20.05s), and fast inference."
+    "takeaway": "On 2999 records, FLAML (lgbm, CV F1 0.9558 +/- 0.0068) does not meaningfully outperform the simple manual champion logreg_C10 (CV F1 0.9485 +/- 0.0094; delta +0.0073, within 1 SD) or the CGPA-only baseline (CV F1 0.9277). Keeping logreg_C10 is preferable for simplicity, lower training cost (0.0030s vs 20.11s), and fast inference."
   }
 }

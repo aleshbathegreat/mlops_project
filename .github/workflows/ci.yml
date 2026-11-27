@@ -6,6 +6,18 @@ on:
     branches: [milestone_1, main]
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install ruff
+      - run: ruff check .
+      - run: ruff format --check .
+
   test:
     runs-on: ubuntu-latest
     steps:
@@ -15,14 +27,12 @@ jobs:
           python-version: "3.12"
           cache: pip
       - run: pip install -r requirements.txt
-      - run: ruff check .
-      - run: ruff format --check .
       - run: python src/prepare_data.py
       - run: python src/train.py
       - run: pytest tests/ -v
 
   docker:
-    needs: test
+    needs: [lint, test]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -34,3 +44,6 @@ jobs:
           sleep 10
           curl --fail http://127.0.0.1:8000/health
           curl --fail http://127.0.0.1:8000/stats
+          curl --fail -X POST http://127.0.0.1:8000/predict \
+            -H "Content-Type: application/json" \
+            -d '{"gre":320,"toefl":110,"university_rating":4,"sop":4.0,"lor":4.0,"cgpa":9.0,"research":1}'

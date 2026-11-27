@@ -5,7 +5,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY src/ src/
-COPY data/Admission_Predict.csv data/Admission_Predict.csv
+COPY data/Large_Dataset.csv data/Large_Dataset.csv
 
 # Build the data and the model inside the image so it is reproducible
 RUN python src/prepare_data.py && python src/train.py

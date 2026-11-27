@@ -32,9 +32,15 @@ export PREV_IMAGE="$(docker inspect --format='{{.Config.Image}}' "$CONTAINER_NAM
 echo "Previous image: ${PREV_IMAGE:-none}"
 ```
 
-### 2.2 Build and tag the new Docker image
+### 2.2 Pre-build lint & test check (recommended)
 
-The `Dockerfile` prepares `data/processed.csv` and trains `models/model.pkl` (`src/prepare_data.py && src/train.py`) during build time so the image is self-contained and reproducible without running slow AutoML searches.
+```bash
+ruff check . && ruff format --check . && pytest tests/ -v
+```
+
+### 2.3 Build and tag the new Docker image
+
+The `Dockerfile` copies `data/Large_Dataset.csv`, prepares `data/processed.csv` (2,999 unique records), and trains `models/model.pkl` (`src/prepare_data.py && src/train.py`) during build time so the image is self-contained and reproducible without running slow AutoML searches.
 
 ```bash
 git pull origin main
@@ -42,7 +48,7 @@ docker build -t "${IMAGE_NAME}:${NEW_TAG}" -t "${IMAGE_NAME}:latest" .
 docker images "$IMAGE_NAME"
 ```
 
-### 2.3 Redeploy (Standard self-contained image)
+### 2.4 Redeploy (Standard self-contained image)
 
 Stop the old container and start the newly tagged image on port `8000`:
 
@@ -56,7 +62,7 @@ docker run -d \
   "${IMAGE_NAME}:${NEW_TAG}"
 ```
 
-### 2.4 Redeploy on EC2 with Persistent `/mnt/mlops-data` Mount (Optional)
+### 2.5 Redeploy on EC2 with Persistent `/mnt/mlops-data` Mount (Optional)
 
 If your EC2 instance has an attached EBS/persistent volume mounted at `/mnt/mlops-data`, use it to store datasets, trained model artifacts, and the MLflow tracking database outside the container lifecycle.
 
@@ -65,7 +71,7 @@ If your EC2 instance has an attached EBS/persistent volume mounted at `/mnt/mlop
 ```bash
 sudo mkdir -p /mnt/mlops-data/{data,models,mlflow,reports}
 sudo chown -R "$USER:$USER" /mnt/mlops-data
-cp -n data/Admission_Predict.csv /mnt/mlops-data/data/Admission_Predict.csv
+cp -n data/Large_Dataset.csv /mnt/mlops-data/data/Large_Dataset.csv
 ```
 
 2. **Seed or retrain the model into `/mnt/mlops-data` before mounting `/app/models`:**
@@ -174,12 +180,14 @@ Verify that:
 docker logs --tail 20 "$CONTAINER_NAME"
 ```
 
-You should see structured `admission_api` request entries such as:
+You should see structured `admission_api` entries for startup, requests, predictions, and any validation/error events:
 
 ```text
-2026-11-24 18:00:01,123 INFO admission_api - GET /health -> 200 (0.31 ms)
-2026-11-24 18:00:05,456 INFO admission_api - POST /predict -> 200 (1.84 ms)
-2026-11-24 18:00:06,012 INFO admission_api - GET /stats -> 200 (0.19 ms)
+2026-11-27 18:00:00,010 INFO admission_api - event=startup model_path=models/model.pkl model_type=Pipeline status=ready
+2026-11-27 18:00:01,123 INFO admission_api - event=request method=GET path=/health status=200 latency_ms=0.31
+2026-11-27 18:00:05,454 INFO admission_api - event=prediction admitted=1 probability=0.9214 gre=320.0 toefl=110.0 cgpa=9.00
+2026-11-27 18:00:05,456 INFO admission_api - event=request method=POST path=/predict status=200 latency_ms=1.84
+2026-11-27 18:00:06,012 INFO admission_api - event=request method=GET path=/stats status=200 latency_ms=0.19
 ```
 
 ---
@@ -243,5 +251,5 @@ docker inspect --format='Running image: {{.Config.Image}}' "$CONTAINER_NAME"
 |---|---|
 | Container stuck in `(starting)` or `(unhealthy)` | Run `docker logs admission-api` and `docker inspect --format='{{json .State.Health}}' admission-api` to see health probe output. |
 | `Bind for 0.0.0.0:8000 failed: port is already allocated` | Find and stop the conflicting process/container (`docker ps` or `ss -tlnp \| grep 8000`). |
-| `FileNotFoundError: models/model.pkl` with `/mnt/mlops-data` mount | Run the Section 2.4 step 2 training command so `/mnt/mlops-data/models/model.pkl` is populated before starting the API. |
+| `FileNotFoundError: models/model.pkl` with `/mnt/mlops-data` mount | Run the Section 2.5 step 2 training command so `/mnt/mlops-data/models/model.pkl` is populated before starting the API. |
 | EC2 external curl times out on port `8000` | Verify `curl http://127.0.0.1:8000/health` works locally on EC2, then check the EC2 Security Group allows inbound TCP `8000`. |

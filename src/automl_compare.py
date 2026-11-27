@@ -152,7 +152,7 @@ def _evaluate_flaml(X_tr, y_tr, X_te, y_te, cv, time_budget, random_state):
     }
 
 
-def _build_summary(results):
+def _build_summary(results, dataset_rows=None):
     by_name = {r["name"]: r for r in results}
     flaml_res = by_name["flaml_automl"]
     manual_res = by_name["logreg_C10"]
@@ -164,15 +164,18 @@ def _build_summary(results):
         flaml_res["cv_f1_std"], manual_res["cv_f1_std"]
     )
     outperforms_manual = delta_vs_manual > 0 and not within_one_std
+    row_label = (
+        f"{dataset_rows} records" if dataset_rows is not None else "this dataset"
+    )
 
     if outperforms_manual:
         takeaway = (
             f"FLAML ({flaml_res['best_estimator']}) outperformed manual logreg_C10 "
-            f"by {delta_vs_manual:+.4f} CV F1 (outside 1 SD) on 400 records."
+            f"by {delta_vs_manual:+.4f} CV F1 (outside 1 SD) on {row_label}."
         )
     else:
         takeaway = (
-            f"On 400 records, FLAML ({flaml_res['best_estimator']}, CV F1 "
+            f"On {row_label}, FLAML ({flaml_res['best_estimator']}, CV F1 "
             f"{flaml_res['cv_f1_mean']:.4f} +/- {flaml_res['cv_f1_std']:.4f}) does not "
             f"meaningfully outperform the simple manual champion logreg_C10 (CV F1 "
             f"{manual_res['cv_f1_mean']:.4f} +/- {manual_res['cv_f1_std']:.4f}; "
@@ -246,7 +249,7 @@ def _render_markdown(payload):
             json.dumps(flaml_res["best_config"], indent=2, sort_keys=True),
             "```",
             "",
-            "## Conclusion: Does AutoML Outperform Simple/Manual Models on 400 Records?",
+            f"## Conclusion: Does AutoML Outperform Simple/Manual Models on {meta['dataset_rows']} Records?",
             "",
             summary["takeaway"],
             "",
@@ -338,7 +341,7 @@ def run_comparison(
             "timestamp_utc": datetime.now(UTC).isoformat(),
         },
         "results": results,
-        "summary": _build_summary(results),
+        "summary": _build_summary(results, dataset_rows=len(df)),
     }
 
     out_path = Path(output_dir)

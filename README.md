@@ -12,13 +12,13 @@ from seven academic features.
 
 ```mermaid
 flowchart LR
-    A[Admission_Predict.csv] --> B[prepare_data.py<br/>clean + validate]
-    B --> C[processed.csv]
+    A[Large_Dataset.csv<br/>3,000 rows] --> B[prepare_data.py<br/>clean, drop text, dedup]
+    B --> C[processed.csv<br/>2,999 unique rows]
     C --> D[train.py<br/>20 models, repeated CV]
     C -. optional benchmark .-> J[automl_compare.py<br/>FLAML vs manual]
     D --> E[(MLflow tracking)]
     J --> E
-    J --> K[reports/automl_comparison.*]
+    J --> K[reports/manual_vs_automl.md<br/>reports/automl_comparison.*]
     D --> F[models/model.pkl<br/>champion]
     F --> G[FastAPI app<br/>/health /predict /stats /docs]
     G --> H[Docker image<br/>HEALTHCHECK + port 8000]
@@ -28,11 +28,15 @@ flowchart LR
 
 ## Dataset
 
-Graduate Admissions dataset (Mohan S. Acharya): 400 applicants, seven
-features, no missing values. Features: `GRE Score`, `TOEFL Score`,
-`University Rating`, `SOP`, `LOR`, `CGPA`, `Research`. The `Serial No.` column
-is dropped, and `Chance of Admit` is only used to build the binary `target`
-label (`>= 0.75`); it is never a model input. The dataset has no time column.
+Extended Graduate Admissions dataset (`data/Large_Dataset.csv`): 3,000 raw
+records reduced to **2,999 unique records** in `data/processed.csv` after
+dropping `Serial No.`, dropping `Motivation Letter` (to preserve the 7-feature
+numeric `/predict` contract), and deduplicating on the 7 academic features:
+`GRE Score`, `TOEFL Score`, `University Rating`, `SOP`, `LOR`, `CGPA`,
+`Research`. `Chance of Admit` is only used to build the binary `target` label
+(`>= 0.75`); it is never a model input. The dataset has no time column.
+(The original 400-row `data/Admission_Predict.csv` is retained in `data/` for
+reference.)
 
 ## Quick start
 
@@ -81,8 +85,13 @@ python src/automl_compare.py --time-budget 20
 
 Every HTTP request passes through thread-safe middleware (`threading.Lock` +
 `time.perf_counter()`) that updates request counters, tracks average latency in
-milliseconds, and logs structured lines (`METHOD PATH -> STATUS (LATENCY ms)`)
-to stdout via the `admission_api` logger.
+milliseconds, and logs structured key-value events to stdout via the
+`admission_api` logger:
+
+- `event=startup` / `event=shutdown`: model path, model class, and readiness status
+- `event=request`: `method`, `path`, `status`, and `latency_ms` for every HTTP call
+- `event=prediction`: `admitted`, `probability`, and key applicant features on `/predict`
+- `event=validation_error` / `event=error`: HTTP `422` schema failures and unhandled exceptions
 
 Inputs are validated with Pydantic (for example GRE `260-340`, TOEFL `0-120`,
 CGPA `0-10`). Out-of-range or wrongly typed values return HTTP `422`.
@@ -154,94 +163,108 @@ reports.
 
 `src/train.py` evaluates 20 configurations across 8 families (baselines, logistic
 regression, trees, SVM, KNN, small neural network, ensembles) using 5-fold
-stratified cross-validation repeated 3 times (15 scores per model). The 20%
-test set (80 rows) is sealed and scored once for reporting only.
+stratified cross-validation repeated 3 times (15 scores per model). On the
+current **2,999-record** dataset, the 80/20 stratified split produces `2,399`
+training rows and `600` sealed test rows (scored once for reporting only).
 
 **Selection rule:** best full-feature model by mean CV F1, then the simplest
 model within one standard deviation of it. Baselines (`dummy`, `cgpa_only`) are
 reference points and cannot be champions.
 
-**Champion:** `logreg_C10` (logistic regression, `C=10`), CV F1 `0.851 (+/- 0.037)`,
-test F1 `0.841`, test ROC-AUC `0.954`.
+**Initial 400-row Milestone 1 baseline & findings** *(earlier `Admission_Predict.csv`, 320 train / 80 test)*:
 
-**Findings:**
-
-- Every real model scored `0.80-0.86` CV F1. A stratified random guesser scored `0.41`.
-- The top ten models lie within one standard deviation of each other, so small
-  ranking differences are not meaningful on 400 records.
-- Logistic regression on `CGPA` alone scored `0.857`, level with the best
-  full-feature model: most of the predictive signal sits in a single feature.
-- Test scores on 80 rows are noisy (two MLPs scored `0.90` and `0.72`), which is
+- **Milestone 1 champion:** `logreg_C10` (logistic regression, `C=10`), CV F1 `0.851 (+/- 0.037)`,
+  test F1 `0.841`, test ROC-AUC `0.954`.
+- Every real model scored `0.80-0.86` CV F1 (vs. `0.41` for a stratified random guesser),
+  with the top ten models within one standard deviation of each other and `CGPA` alone
+  scoring `0.857`.
+- Test scores on 80 rows were noisy (two MLPs scored `0.90` and `0.72`), which is
   why champion selection relies on repeated cross-validation rather than the
-  test split.
+  test split. The current pipeline runs on **2,999 unique records** (`2,399` train / `600` test),
+  summarized in the Project Focus section below.
 
 ## Project Focus: AutoML (`FLAML`) vs. Manual Training Comparison
 
-### Why this focus fits
+### 1. Why this focus fits
 
-Because our Milestone 1 manual benchmark showed that the top 10 models on 400
-rows fall within 1 standard deviation—and that a single-feature `CGPA` baseline
-already matches multi-feature models—our Milestone 2 project focus tests
-whether bounded automated machine learning (`FLAML`) can meaningfully
-outperform a simple, fast manual linear champion (`logreg_C10`) under an
-identical, leak-free evaluation protocol.
+On the original 400-row dataset, the top 10 manual models fell within 1 standard
+deviation and a single-feature `CGPA` baseline matched multi-feature models.
+Scaling to **2,999 unique records** (`data/Large_Dataset.csv` after
+deduplication) lets us test whether bounded automated machine learning
+(`FLAML`) meaningfully outperforms our curated 20-model manual pipeline
+(`src/train.py`) once enough samples exist to separate linear and non-linear
+decision boundaries.
 
-### Comparison protocol & metrics
+### 2. Comparison protocol & metrics
 
-[src/automl_compare.py](src/automl_compare.py) reuses the exact 80/20
-stratified split (`320` train / `80` sealed test, `random_state=42`) and
-`RepeatedStratifiedKFold(n_splits=5, n_repeats=3, random_state=42)` setup from
-[src/train.py](src/train.py). Both manual reference models and a bounded
-20-second `FLAML` `AutoML` search (optimizing `f1` across `lgbm`, `xgboost`,
-`rf`, `extra_tree`, `lrl1`, `lrl2`, and `kneighbor`) are logged to MLflow
-(`admission-automl-comparison`) across:
+Both pipelines use an identical, leak-free 80/20 stratified split (`2,399`
+train / `600` sealed test) and `RepeatedStratifiedKFold(n_splits=5, n_repeats=3)`:
 
-- `cv_f1_mean` & `cv_f1_std` (repeated CV on the 320-row training split)
-- `test_f1` & `test_roc_auc` (scored once on the 80-row sealed test split)
-- `train_time_sec` (wall-clock training/search duration)
-- `inference_latency_ms` (measured per-sample inference latency on test rows)
+- **5-seed benchmark** ([reports/manual_vs_automl.md](reports/manual_vs_automl.md)):
+  Compares the 20-model manual suite (`src/train.py`, including RBF `SVC` and
+  ensembles) against `FLAML` `AutoML` at `15s` and `60s` budgets across 5 seeds,
+  tracking mean test `ROC-AUC`, wall-clock / developer time, and seed win rate.
+- **Single-seed detailed comparison** ([src/automl_compare.py](src/automl_compare.py)):
+  Logs `cv_f1_mean`, `cv_f1_std`, `test_f1`, `test_roc_auc`, `train_time_sec`,
+  and `inference_latency_ms` to MLflow (`admission-automl-comparison`) and
+  exports [reports/automl_comparison.md](reports/automl_comparison.md) and
+  [reports/automl_comparison.json](reports/automl_comparison.json).
 
-### Current benchmark results (`--time-budget 20`)
+### 3. Current benchmark results (2,999 records)
+
+**5-seed study summary:**
+
+| Approach | Compute / Search Budget | Mean Test ROC-AUC | Wins vs. Manual (5 Seeds) |
+|---|---|---|---|
+| Manual 20-model pipeline (`src/train.py`) | `257s` manual compute (wall-clock, no search budget) | **0.9630** | Baseline |
+| FLAML AutoML (`15s` budget) | `15s` budget / `16s` dev time | `0.9557` | `0 / 5` |
+| FLAML AutoML (`60s` budget) | `60s` budget / `61s` dev time | `0.9603` | `1 / 5` |
+
+**Single-seed `automl_compare.py --time-budget 20` snapshot:**
 
 | Model | Method | Best Estimator | CV F1 (mean +/- std) | Test F1 | Test ROC-AUC | Train Time (s) | Inference Latency (ms/sample) |
 |---|---|---|---|---|---|---|---|
-| `logreg_C10` | manual_champion | `logreg` | `0.8510 +/- 0.0372` | `0.8406` | `0.9539` | `0.0027` | `0.1872` |
-| `cgpa_only_logreg` | manual_baseline | `cgpa_only` | `0.8566 +/- 0.0302` | `0.8406` | `0.9571` | `0.0046` | `0.6917` |
-| `flaml_automl` | automl | `xgboost` | `0.8328 +/- 0.0417` | `0.8529` | `0.9498` | `20.0523` | `0.4130` |
+| `logreg_C10` | manual_champion | `logreg` | `0.9485 +/- 0.0094` | `0.9458` | `0.9347` | `0.0030` | `0.1877` |
+| `cgpa_only_logreg` | manual_baseline | `cgpa_only` | `0.9277 +/- 0.0087` | `0.9262` | `0.8997` | `0.0024` | `0.5520` |
+| `flaml_automl` | automl | `lgbm` | `0.9558 +/- 0.0068` | `0.9570` | `0.9612` | `20.1079` | `0.7120` |
 
-**Takeaway:** On 400 records, FLAML (`xgboost`, CV F1 `0.8328 +/- 0.0417`) does
-**not** outperform `logreg_C10` (`0.8510 +/- 0.0372`; delta `-0.0182`, within 1
-SD) or `cgpa_only_logreg` (`0.8566`). Keeping `logreg_C10` in production is
-preferable for simplicity, ~7,400x faster training (`0.0027s` vs. `20.05s`), and
-lower per-sample inference latency (`0.1872 ms` vs. `0.4130 ms`). Full outputs
-are saved in [reports/automl_comparison.md](reports/automl_comparison.md) and
-[reports/automl_comparison.json](reports/automl_comparison.json).
+**Takeaway:** Across 5 seeds on 2,999 records, the manual 20-model pipeline
+(`0.9630` ROC-AUC in `257s` manual compute) outperforms bounded FLAML: at `15s`
+(`16s` dev time), FLAML achieves `0.9557` ROC-AUC with `0/5` wins and a paired
+delta of `-0.0073 +/- 0.0044`; at `60s` (`61s` dev time), FLAML reaches `0.9603`
+ROC-AUC with `1/5` wins and a paired delta of `-0.0027 +/- 0.0025` (the single
+win at `60s` barely crossed by `0.0002`). FLAML trails mainly because its
+default estimator space lacks kernel **SVM** (`SVC`), which fits this 7-feature
+numeric boundary well, making AutoML ideal for rapid baseline discovery while
+the manual pipeline remains preferable for final model selection.
 
-### Next steps toward the final demo
+### 4. Next steps toward the final demo
 
 - Explore probability calibration and decision-threshold sensitivity on the
   manual champion vs. AutoML candidates.
 - Simulate shifted/out-of-range applicant traffic against the deployed EC2
-  service and observe live `/stats` latency, request counts, and HTTP `422`
-  validation behavior.
+  service and observe live `/stats` latency, request counts, structured logs,
+  and HTTP `422` validation behavior.
 - Finalize the live EC2 + MLflow demo walkthrough for final evaluation.
 
 ## Tests and CI
 
-`pytest` runs 11 tests across two test modules:
+`pytest` runs 15 tests across two test modules:
 
-- [tests/test_app.py](tests/test_app.py) (9 tests): `/health`, `/predict`
+- [tests/test_app.py](tests/test_app.py) (13 tests): `/health`, `/predict`
   (valid, wrong-type `422`, out-of-range `422`), `/stats` schema and request
-  counter/latency tracking, model loading, and `prepare_data` validation.
+  counter/latency tracking, structured logging (`startup`/`shutdown`, `request`,
+  `prediction`, `validation_error`, `error`), model loading, and `prepare_data`
+  validation on `data/Large_Dataset.csv` (2,999 unique records).
 - [tests/test_automl_compare.py](tests/test_automl_compare.py) (2 tests): CLI
   argument parsing and fast (`--time-budget 2`) end-to-end AutoML comparison
   using isolated temporary outputs and MLflow DB.
 
-GitHub Actions ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs on
-every push and pull request to `main` and `milestone_1`: `ruff check .`,
-`ruff format --check .`, `prepare_data.py`, `train.py`, `pytest tests/ -v`,
-then a Docker build with `/health` and `/stats` smoke tests (skipping long
-AutoML searches so CI stays fast).
+GitHub Actions ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs separate
+`lint` (`ruff check .`, `ruff format --check .`), `test` (`prepare_data.py`,
+`train.py`, `pytest tests/ -v`), and `docker` (gated on `lint` and `test`,
+building the image and smoke-testing `/health`, `/stats`, and `/predict`) jobs
+on every push and pull request to `main` and `milestone_1`.
 
 ## Project structure
 
@@ -263,12 +286,14 @@ AI_USAGE.md                  AI tool usage and human review disclosure
 
 ## Limitations
 
-- 400 records means noisy comparisons; small differences between models should
-  not be over-read.
-- The dataset has no time dimension, so behaviour under new data is studied by
-  simulation rather than real arrivals.
+- Even with 2,999 unique records, the dataset has no time dimension, so
+  behaviour under new data is studied by simulation rather than real arrivals.
+- `Motivation Letter` is dropped in `src/prepare_data.py` to preserve the
+  7-feature numeric `/predict` contract; incorporating text features would
+  require updating the API schema.
 
 ## Team
 
-See [CONTRIBUTION.md](CONTRIBUTION.md). AI tool usage is documented in
-[AI_USAGE.md](AI_USAGE.md).
+See [CONTRIBUTION.md](CONTRIBUTION.md) (including estimated Milestone 2 effort of
+~12 hours each for Aleshba Tariq and Syed M Abdullah Yousuf). AI tool usage is
+documented in [AI_USAGE.md](AI_USAGE.md).
